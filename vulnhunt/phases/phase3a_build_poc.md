@@ -46,7 +46,7 @@ to Phase 2b (the runtime decision was skipped, not deferred).
 ## What counts as a Working PoC
 
 An **executable artifact**, not a markdown narrative. A real request against a
-real (containerized) server, or a real function invocation in the provisioned
+real (sandboxed) server, or a real function invocation in the provisioned
 runtime — per the finding's recorded `Runtime:` line. The `poc/VULN-NNN.md`
 file remains, but as a wrapper *around* the executable artifact: it documents
 the PoC, links to the script, and records its output. It does not replace it.
@@ -65,7 +65,7 @@ the attack for real, in the recorded runtime:
 ```bash
 #!/bin/bash
 # Working PoC for [VULN-NNN]: [Title]
-# Runtime: docker:<image>@<tag>   (copied from the finding's Runtime line)
+# Runtime: daytona:<snapshot>   (copied from the finding's Runtime line)
 # Preconditions: [what needs to be running]
 
 curl -X POST http://localhost:8080/api/endpoint \
@@ -76,9 +76,9 @@ curl -X POST http://localhost:8080/api/endpoint \
 ```python
 # Working PoC for VULN-NNN — executes in the recorded runtime
 # (in-process harness example)
-payload = build_payload_from_poc("VULN-NNN")   # EXACT payload from the PoC doc
+payload = build_payload_from_poc("VULN-NNN")  # EXACT payload from the PoC doc
 result = invoke_vulnerable_function(payload)
-print(observed_outcome(result))                # what the attacker gained
+print(observed_outcome(result))  # what the attacker gained
 ```
 
 The script MUST print the observed outcome in a form Phase 3b can measure

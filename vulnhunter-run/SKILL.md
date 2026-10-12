@@ -52,10 +52,17 @@ The `vh` commands do not talk to a model.
 4. **Manifest.** Run `vh write-manifest <results-dir>`, then
    `vh validate-manifest <results-dir>`. If validation fails, stop and report
    the error. Do not hand-edit the manifest to force a pass.
-5. **Stop.** Tell the user the results path and whether the manifest
-   validated. Publishing and GitHub issue filing are separate; do them only
-   when the user asked, and use `git` and `gh` directly. Do not claim an
-   issue was filed unless `gh` printed the URL.
+5. **Re-run exploits.** Run `vh run-exploits <results-dir>`. It re-executes
+   the scan's exploit tests; a non-zero exit means a confirmed finding's PoC
+   no longer reproduces, or a manifest finding has no test. Report the
+   pass/fail counts. Use `--allow-missing` only when a finding without a test
+   is acceptable. When no local Docker/pytest is wanted, add `--daytona` to
+   run the tests in a Daytona sandbox (snapshot from `--snapshot`, default
+   `$VULNHUNT_DAYTONA_SNAPSHOT`; clone the target with `--repo`).
+6. **Stop.** Tell the user the results path and whether the manifest
+   validated and the exploit tests reproduced. Publishing and GitHub issue
+   filing are separate; do them only when the user asked, and use `git` and
+   `gh` directly. Do not claim an issue was filed unless `gh` printed the URL.
 
 ## Headless lab use
 

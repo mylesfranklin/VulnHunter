@@ -50,7 +50,15 @@ python -m agent https://github.com/your-org/your-service
 
 # Scan only, no publish/issues:
 python -m agent https://github.com/your-org/your-service --no-publish --no-issues
+
+# Fast static scan (write exploit tests, don't run them):
+python -m agent https://github.com/your-org/your-service --read-only
 ```
+
+> **Scans execute by default.** The scan installs the target's dependencies
+> and runs the exploit tests against the recorded runtime (Bash is enabled
+> automatically). `--read-only` opts into a fast static scan. The older
+> `--no-read-only --enable-bash` pair is still accepted and now redundant.
 
 ## Configuration
 
@@ -83,7 +91,8 @@ SSO, or an instance/task role. Most users want the default `api_key` mode.
 - `[sandbox]` — OS-level filesystem/network sandbox for the CLI's tools.
 - `[telemetry]` — optional OTLP export; `otel_exporter_otlp_endpoint` +
   `resource_attributes` (neutral default; set your own owner/org tags).
-- `[scan]` — cloned-repo dir, allowed tools (`Bash` is stripped unless `--enable-bash`),
+- `[scan]` — cloned-repo dir, allowed tools (`Bash` is added automatically when
+  the scan executes — the default; pass `--read-only` for a static scan),
   `no_proxy`, autocompact threshold, stall timeout.
 - `[verify]` — scratch dir and a `repo_aliases` table for cross-repo hint resolution.
 

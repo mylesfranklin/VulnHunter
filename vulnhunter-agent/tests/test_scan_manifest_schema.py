@@ -147,6 +147,32 @@ def test_nullable_poc_paths_validate(
     validator.validate(manifest)
 
 
+def test_runtime_and_measured_impact_validate(
+    validator: Draft202012Validator, manifest: dict[str, Any]
+) -> None:
+    """Execution evidence is part of the finding contract (optional field)."""
+    manifest["findings"][0]["runtime"] = "daytona:cd-python"
+    manifest["findings"][0]["measured_impact"] = "3 of 20 payloads leaked rows"
+    validator.validate(manifest)
+
+
+def test_runtime_empty_string_validates(
+    validator: Draft202012Validator, manifest: dict[str, Any]
+) -> None:
+    """Absent report evidence coerces to "" — must stay schema-valid."""
+    manifest["findings"][0]["runtime"] = ""
+    manifest["findings"][0]["measured_impact"] = ""
+    validator.validate(manifest)
+
+
+def test_runtime_non_string_rejected(
+    validator: Draft202012Validator, manifest: dict[str, Any]
+) -> None:
+    manifest["findings"][0]["runtime"] = 42
+    with pytest.raises(ValidationError):
+        validator.validate(manifest)
+
+
 @pytest.mark.parametrize(
     "field",
     [

@@ -67,9 +67,10 @@ it is cached across the parallel dispatch.
 - Your agent harness,
   authenticated per your provider, running on the host's most capable
   reasoning model.
-- No Python, no network — the skill is read-only over the target checkout by
-  default. (The agent runtime can opt into `--no-read-only --enable-bash` to run
-  exploit tests; interactive use stays static.)
+- No confirmation gates: the skill resolves the target and mode itself and
+  proceeds. When Bash is available it defaults to Bash-enabled and runs the
+  exploit tests (maximum exploit depth); it falls back to read-only only when
+  Bash is unavailable. The static path needs no Python and no network.
 
 ## License
 

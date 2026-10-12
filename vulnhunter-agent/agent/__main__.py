@@ -219,17 +219,20 @@ def _build_parser() -> argparse.ArgumentParser:
         dest="read_only",
         action="store_true",
         default=None,
-        help="Append a read-only suffix to the /vulnhunt prompt: skip "
-        "dependency installation and code execution. This is the default.",
+        help="Force a static scan: append a read-only suffix to the "
+        "/vulnhunt prompt so it skips dependency installation and code "
+        "execution. Without this flag (and without --no-read-only) the "
+        "scan defaults to EXECUTION — dependencies installed, exploit "
+        "tests run.",
     )
     readonly_group.add_argument(
         "--no-read-only",
         dest="read_only",
         action="store_false",
         default=None,
-        help="Allow the scan to install dependencies and execute code "
-        "(needed for exploit-test verification). Must be combined with "
-        "--enable-bash; the runner refuses to start otherwise.",
+        help="Explicitly opt into execution (also the default when "
+        "neither flag is given): install dependencies and run exploit "
+        "tests. Accepted alone; kept for symmetry with --read-only.",
     )
     scan_section.add_argument(
         "--enable-bash",
@@ -237,10 +240,11 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         default=False,
         help="Add Bash to the model's tool allow-list for this run. "
-        "Required to pair with --no-read-only. Deliberately CLI-only — "
-        "the config file has no equivalent knob, so a stray TOML can't "
-        "silently re-enable arbitrary code execution. Has no effect on "
-        "read-only scans (the model is told not to execute code anyway).",
+        "Accepted alone; Bash is enabled automatically whenever the scan "
+        "executes (the default). Conflicts with --read-only, where there "
+        "is nothing to run. Deliberately CLI-only — the config file has "
+        "no equivalent knob, so a stray TOML can't silently toggle "
+        "arbitrary code execution.",
     )
 
     # ---- verify-mode flags -----------------------------------------------
@@ -734,6 +738,18 @@ def _resolve_repo_properties(
     return repo_props.resolve(cli_overrides=cli, github=fetched)
 
 
+def _effective_execution(read_only_flag: bool | None) -> tuple[bool, bool]:
+    """Resolve ``(read_only, enable_bash)`` from the ``--read-only`` tri-state.
+
+    Execution is the default: only an explicit ``--read-only`` (True) turns
+    it off. Bash is derived from the mode, so the two can never disagree.
+    ``--no-read-only`` and ``--enable-bash`` are accepted as explicit
+    confirmations but change nothing when execution is already the default.
+    """
+    read_only = False if read_only_flag is None else read_only_flag
+    return read_only, not read_only
+
+
 async def _amain(args: argparse.Namespace) -> int:
     """Scan-mode entrypoint. Loads config, applies audit + logging
     overrides, and dispatches to ``_run_scan_flow``.
@@ -814,23 +830,17 @@ async def _run_scan_flow(
             "" if args.read_only else "no-",
         )
 
-    # --enable-bash and --no-read-only are a paired flag: each requires
-    # the other. main() ran the parser-level pairing check too — this
-    # is a defense-in-depth assertion for programmatic callers that
-    # bypass main() (none exist today, but the invariant is small and
-    # the failure mode if it ever happened — silently scanning with
-    # Bash enabled — is bad enough to justify the belt-and-suspenders).
-    effective_read_only = True if args.read_only is None else args.read_only
+    # Execution is the default: only an explicit --read-only turns it off.
+    # Bash is derived from the mode (enabled iff executing), so the old
+    # "pairing" invariant is now structural. An explicit --enable-bash with
+    # --read-only is still rejected by main()'s arg-validation; the
+    # assertion below is defense-in-depth for programmatic callers that
+    # bypass main().
+    effective_read_only, effective_enable_bash = _effective_execution(args.read_only)
     if scan and args.enable_bash and effective_read_only:
         raise RuntimeError(
             "Internal invariant violated: enable_bash=True with "
             "read_only=True. main()'s arg-validation should have rejected "
-            "this combination before _amain ran."
-        )
-    if scan and not effective_read_only and not args.enable_bash:
-        raise RuntimeError(
-            "Internal invariant violated: read_only=False without "
-            "enable_bash. main()'s arg-validation should have rejected "
             "this combination before _amain ran."
         )
 
@@ -890,7 +900,7 @@ async def _run_scan_flow(
                 model_override=args.model,
                 scan_id=args.scan_id,
                 read_only=effective_read_only,
-                enable_bash=args.enable_bash,
+                enable_bash=effective_enable_bash,
                 audit_writer=audit_writer,
                 totals_out=scan_totals,
             )
@@ -1208,26 +1218,17 @@ def main(argv: list[str] | None = None) -> int:
         if args.no_reopen:
             parser.error("--no-reopen is verify-mode only.")
 
-        # Validate the --enable-bash / --no-read-only pairing before any
-        # subsequent setup (logging, config load, clone) — the policy lives
-        # at the CLI surface so a config-file regression can't quietly land
-        # us in Bash-enabled mode. Only enforce when scan would actually
-        # run; --no-scan paths are passive and don't touch the SDK.
-        if args.scan is not False:  # default None or explicit True
-            if args.enable_bash and args.read_only is not False:
-                parser.error(
-                    "--enable-bash requires --no-read-only. Bash is only "
-                    "meaningful when the scan is allowed to install "
-                    "dependencies and execute code; a read-only scan has "
-                    "nothing to run."
-                )
-            if args.read_only is False and not args.enable_bash:
-                parser.error(
-                    "--no-read-only requires --enable-bash. Code execution "
-                    "is the whole point of a non-read-only scan, and Bash "
-                    "is the tool that runs the exploit tests. Pass both "
-                    "flags together to opt in."
-                )
+        # Execution is the default; the flags below are explicit
+        # confirmations. The only incoherent combination is --enable-bash
+        # with --read-only: a read-only scan executes nothing, so Bash has
+        # nothing to run. Validate at the CLI surface before any setup.
+        # (--no-scan paths don't touch the SDK and waive the check.)
+        if args.scan is not False and args.enable_bash and args.read_only is True:
+            parser.error(
+                "--enable-bash conflicts with --read-only: a read-only "
+                "scan executes nothing. Drop --read-only (execution is "
+                "the default) or drop --enable-bash."
+            )
     else:  # verify
         # Reject scan-only flags when used with verify mode.
         scan_only_flags = []

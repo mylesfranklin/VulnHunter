@@ -96,9 +96,11 @@ _VULNHUNT_PROMPT_PREAMBLE = (
 # Appended when read_only=True. Matches the harness's --read-only
 # semantics (harness/scan.py): the model still has Bash/Edit/Write
 # available, but the prompt asks it to skip dependency installation
-# and any code execution. This is the default — runs that need to
-# install deps or execute code (e.g. exploit_test verification) must
-# explicitly pass read_only=False.
+# and any code execution. The CLI (_amain) now defaults to EXECUTION
+# and passes read_only=False; this function-level default stays True
+# so programmatic callers that omit the flag get the conservative mode.
+# Runs that need to install deps or execute code (e.g. exploit_test
+# verification) must pass read_only=False.
 _READONLY_PROMPT_SUFFIX = (
     " Perform a read-only scan, skip instructions related to "
     "getting dependencies and executing code."

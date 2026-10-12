@@ -502,7 +502,7 @@ class TestBuildParserNewFlags:
 
     def test_read_only_default_is_none(self) -> None:
         args = _build_parser().parse_args(["--mode=scan", "url"])
-        assert args.read_only is None  # __main__ defaults to True at use-time
+        assert args.read_only is None  # __main__ resolves None to execution
 
     def test_read_only_flag(self) -> None:
         args = _build_parser().parse_args(["--mode=scan", "url", "--read-only"])
@@ -612,34 +612,46 @@ def test_main_rejects_enable_bash_with_read_only(
     tmp_path: Path,
     capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """--enable-bash without --no-read-only is nonsensical (read-only mode
-    forbids code execution) and must be rejected at arg-validation time
+    """--enable-bash together with --read-only is contradictory (a static
+    scan executes nothing) and must be rejected at arg-validation time
     before any clone / SDK invocation happens.
     """
     _stub_main_environment_for_args(monkeypatch, tmp_path)
     import agent.__main__ as _m
 
     with pytest.raises(SystemExit):
-        _m.main(["--mode=scan", "https://example.com/x", "--enable-bash"])
+        _m.main(["--mode=scan", "https://example.com/x", "--read-only", "--enable-bash"])
     err = capsys.readouterr().err
-    assert "--enable-bash requires --no-read-only" in err
+    assert "--enable-bash conflicts with --read-only" in err
 
 
-def test_main_rejects_no_read_only_without_enable_bash(
+def test_main_accepts_execution_flags_alone(
     monkeypatch: pytest.MonkeyPatch,
     tmp_path: Path,
-    capsys: pytest.CaptureFixture[str],
 ) -> None:
-    """--no-read-only without --enable-bash means "execute code without
-    a tool to execute it" — also nonsensical. Reject up-front.
+    """Execution is the default, so --no-read-only and --enable-bash are
+    each accepted on their own (no pairing requirement anymore). Drive
+    through main() with _amain stubbed so only arg-validation runs.
     """
     _stub_main_environment_for_args(monkeypatch, tmp_path)
     import agent.__main__ as _m
 
-    with pytest.raises(SystemExit):
-        _m.main(["--mode=scan", "https://example.com/x", "--no-read-only"])
-    err = capsys.readouterr().err
-    assert "--no-read-only requires --enable-bash" in err
+    async def _noop_amain(_args: object) -> int:
+        return 0
+
+    monkeypatch.setattr(_m, "_amain", _noop_amain)
+
+    assert _m.main(["--mode=scan", "https://example.com/x", "--no-read-only"]) == 0
+    assert _m.main(["--mode=scan", "https://example.com/x", "--enable-bash"]) == 0
+
+
+def test_effective_execution_defaults_to_execution() -> None:
+    """Tri-state None (neither flag) resolves to execution + Bash."""
+    import agent.__main__ as _m
+
+    assert _m._effective_execution(None) == (False, True)
+    assert _m._effective_execution(False) == (False, True)
+    assert _m._effective_execution(True) == (True, False)
 
 
 def test_main_no_scan_does_not_enforce_bash_pairing(

@@ -143,6 +143,14 @@
           "description": "Concrete consequence (data disclosure, RCE, account takeover, etc.).",
           "type": "string"
         },
+        "runtime": {
+          "description": "Recorded execution runtime for the finding's PoC (Phase 2b): 'daytona:<snapshot>', 'daytona:built:<snapshot>', 'in-process:<description>', 'static — <justification>', or 'EXECUTED-MOCK — <what was mocked>'. Empty string when the report carried no Runtime line. Optional so pre-existing manifests still validate.",
+          "type": "string"
+        },
+        "measured_impact": {
+          "description": "Phase 3b measured impact in the vulnerability class's natural unit (e.g. '3 of 20 payloads returned victim-tenant rows'), with its denominator. Empty string when the finding is static or unmeasured. Optional so pre-existing manifests still validate.",
+          "type": "string"
+        },
         "fix_strategy": {
           "description": "One-sentence summary of the proposed fix from the report.",
           "type": "string"

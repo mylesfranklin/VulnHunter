@@ -80,6 +80,21 @@ REGISTRY: tuple[EnvVar, ...] = (
         "The harness's headless one-shot. argv = shlex.split(value) + [prompt_file]; the program writes its transcript to stdout. Owned by hostcmd (vulnhunter_common) for resolution/spawn/timeout.",
         (OWNER_VH, OWNER_HARNESS, OWNER_AGENT, OWNER_SKILLS),
     ),
+    # --- sandbox runtime (Daytona) ---
+    EnvVar(
+        "VULNHUNT_DAYTONA_BIN",
+        "Daytona CLI binary the runtimes shell out to for sandbox provisioning "
+        "(default: 'daytona'). The portable path when the Daytona MCP is not present.",
+        (OWNER_VH, OWNER_SKILLS),
+        default="daytona",
+    ),
+    EnvVar(
+        "VULNHUNT_DAYTONA_SNAPSHOT",
+        "Default Daytona snapshot a sandbox is created from when no explicit "
+        "snapshot is given (default: 'daytona-small').",
+        (OWNER_VH, OWNER_SKILLS),
+        default="daytona-small",
+    ),
     # --- model selection ---
     EnvVar(
         "VULNHUNT_MODEL",

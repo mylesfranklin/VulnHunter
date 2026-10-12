@@ -23,6 +23,8 @@ from pathlib import Path
 
 from vulnhunter_common import gitops, hostcmd, manifest
 
+from . import exploits
+
 _SCAN_ID = re.compile(r"^.+_VULNHUNT_RESULTS_.+$")
 _EXIT_OK = {0, 1, 2, 3, 4}
 
@@ -172,6 +174,87 @@ def cmd_host(args: argparse.Namespace) -> int:
     return proc.returncode
 
 
+def _indent(text: str, prefix: str = "    ") -> str:
+    lines = text.rstrip("\n").splitlines()
+    return "\n".join(prefix + line for line in lines)
+
+
+def cmd_run_exploits(args: argparse.Namespace) -> int:
+    """Run the scan's exploit tests and fail if any no longer reproduce."""
+    results = Path(args.results).resolve()
+    if not results.is_dir():
+        print(f"not a directory: {results}", file=sys.stderr)
+        return 2
+
+    expected = exploits.expected_tests(results)
+    tests = exploits.discover_tests(results)
+    if not expected and not tests:
+        print(f"no exploit tests found under {results / exploits.EXPLOIT_TESTS_DIRNAME}")
+        return 0
+
+    # finding id -> resolved test path (from the manifest). A finding whose
+    # referenced test is missing is a failure unless --allow-missing.
+    referenced: dict[Path, list[str]] = {}
+    missing: list[tuple[str, str]] = []
+    for finding_id, rel in sorted(expected.items()):
+        path = (results / rel).resolve()
+        if path.is_file():
+            referenced.setdefault(path, []).append(finding_id)
+        else:
+            missing.append((finding_id, rel))
+    unreferenced = [t.resolve() for t in tests if t.resolve() not in referenced]
+    targets = sorted({*referenced, *unreferenced})
+
+    # Two transports, same contract. Daytona is the portable path when no
+    # local Docker/pytest is wanted; local is the default for speed.
+    if args.daytona:
+        try:
+            _sandbox, ran = exploits.run_in_daytona(
+                results,
+                targets,
+                snapshot=args.snapshot,
+                repo=args.repo,
+                workdir=args.workdir,
+                keep=args.keep,
+                ttl=args.ttl,
+            )
+        except exploits.DaytonaError as exc:
+            print(f"daytona error: {exc}", file=sys.stderr)
+            return 2
+        outcomes = [ran[path] for path in targets if path in ran]
+    else:
+        python = args.python or sys.executable
+        extra = tuple(args.pytest_arg or ())
+        outcomes = [
+            exploits.run_test(path, cwd=results, python=python, extra_args=extra)
+            for path in targets
+        ]
+
+    failures = [o for o in outcomes if not o.passed]
+    for outcome in outcomes:
+        rel_path = (
+            outcome.path.relative_to(results)
+            if outcome.path.is_relative_to(results)
+            else outcome.path
+        )
+        ids = referenced.get(outcome.path, [])
+        label = f" [{', '.join(ids)}]" if ids else ""
+        if outcome.passed:
+            print(f"PASS {rel_path}{label}")
+        else:
+            print(f"FAIL (exit {outcome.returncode}) {rel_path}{label}")
+            print(_indent(outcome.output))
+    for finding_id, rel in missing:
+        print(f"MISSING {finding_id} -> {rel}")
+
+    passed = len(outcomes) - len(failures)
+    tail = f"; {len(missing)} missing" if missing else ""
+    print(f"\n{passed}/{len(outcomes)} exploit tests passed{tail}")
+    if failures or (missing and not args.allow_missing):
+        return 1
+    return 0
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="vh")
     sub = parser.add_subparsers(dest="cmd", required=True)
@@ -205,6 +288,61 @@ def build_parser() -> argparse.ArgumentParser:
     host = sub.add_parser("host", help="run $VULNHUNT_HOST_CMD with a prompt file")
     host.add_argument("prompt")
     host.set_defaults(func=cmd_host)
+
+    run = sub.add_parser(
+        "run-exploits",
+        help="re-run a scan's exploit tests; fail if a finding no longer reproduces",
+    )
+    run.add_argument("results", help="path to a *_VULNHUNT_RESULTS_* directory")
+    run.add_argument(
+        "--python",
+        default=None,
+        help="interpreter to run pytest with (default: the current interpreter)",
+    )
+    run.add_argument(
+        "--pytest-arg",
+        action="append",
+        default=None,
+        help="extra argument passed to pytest (repeatable)",
+    )
+    run.add_argument(
+        "--allow-missing",
+        action="store_true",
+        help="don't fail when a manifest finding's exploit_test_path is absent",
+    )
+    run.add_argument(
+        "--daytona",
+        action="store_true",
+        help="run the tests in a Daytona sandbox instead of locally (no local Docker required)",
+    )
+    run.add_argument(
+        "--snapshot",
+        default=None,
+        help="Daytona snapshot to create the sandbox from "
+        "(default: $VULNHUNT_DAYTONA_SNAPSHOT or 'daytona-small')",
+    )
+    run.add_argument(
+        "--repo",
+        default=None,
+        help="git URL to clone into the sandbox before running the tests",
+    )
+    run.add_argument(
+        "--workdir",
+        default=exploits.DEFAULT_WORKDIR,
+        help=f"working directory inside the sandbox (default: {exploits.DEFAULT_WORKDIR})",
+    )
+    run.add_argument(
+        "--keep",
+        action="store_true",
+        help="leave the Daytona sandbox running after the run (debugging)",
+    )
+    run.add_argument(
+        "--ttl",
+        type=int,
+        default=None,
+        help="sandbox time-to-live in minutes (auto-destroy)",
+    )
+    run.set_defaults(func=cmd_run_exploits)
     return parser
 
 

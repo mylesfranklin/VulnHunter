@@ -29,7 +29,7 @@ NOT get their own summary-table rows.
 
 | ID | Title | CWE | Severity | Runtime | Exploit Test | Measured Impact | Status |
 |---|---|---|---|---|---|---|---|
-| VULN-001 | [title] | CWE-XXX | High+/High/Medium/Low/Informational | docker:image@tag / in-process:desc / static | PASS/FAIL | [the number in the class's impact unit] | Confirmed/Fixed/Verified |
+| VULN-001 | [title] | CWE-XXX | High+/High/Medium/Low/Informational | daytona:snapshot / in-process:desc / static | PASS/FAIL | [the number in the class's impact unit] | Confirmed/Fixed/Verified |
 | ... | ... | ... | ... | ... | ... | ... | ... |
 
 The `Runtime` column copies the finding's Phase 2b `Runtime:` line. The

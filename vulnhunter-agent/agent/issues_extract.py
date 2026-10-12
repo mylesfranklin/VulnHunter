@@ -51,6 +51,14 @@ class Finding:
     # across scans so re-runs collide on the same vulnerability even if
     # VulnHunter renumbers VULN-IDs between scans.
     vulnfix_key: str = ""
+    # Phase 2b recorded execution runtime (daytona:.../daytona:built:.../
+    # in-process:.../static — .../EXECUTED-MOCK — ...). Empty when the
+    # report had no Runtime line. Carried into the manifest so execution
+    # evidence is machine-readable, not prose-only.
+    runtime: str = ""
+    # Phase 3b measured impact in the class's natural unit, with its
+    # denominator. Empty when static/unmeasured.
+    measured_impact: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -97,6 +105,8 @@ determined from the report — never invent values):
       "entry_point": "HTTP route, function, or other public surface.",
       "exploit_description": "What an attacker can do (1-3 sentences). Describe behavior, not exploit code.",
       "exploit_impact": "Concrete consequence (data disclosure, RCE, account takeover, etc.).",
+      "runtime": "The finding's recorded Runtime line verbatim, e.g. 'daytona:daytona-small' or 'daytona:built:vh-nginx-1.27' or 'in-process:<desc>' or 'static — <reason>' or 'EXECUTED-MOCK — <what was mocked>'. Empty string if the report has no Runtime line.",
+      "measured_impact": "The value from the finding's Measured Impact block, with its denominator, e.g. '3 of 20 payloads returned victim-tenant rows'. Empty string if absent.",
       "fix_strategy": "One-sentence summary of the proposed fix from the report.",
       "severity_rationale": "Why this severity (impact + reachability)."
     }
@@ -171,6 +181,8 @@ def _coerce_finding(raw: dict[str, Any], files: dict[str, dict[str, str]]) -> Fi
         entry_point=str(raw.get("entry_point", "")).strip(),
         exploit_description=str(raw.get("exploit_description", "")).strip(),
         exploit_impact=str(raw.get("exploit_impact", "")).strip(),
+        runtime=str(raw.get("runtime", "")).strip(),
+        measured_impact=str(raw.get("measured_impact", "")).strip(),
         fix_strategy=str(raw.get("fix_strategy", "")).strip(),
         severity_rationale=str(raw.get("severity_rationale", "")).strip(),
         poc_path=related.get("poc"),

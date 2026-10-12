@@ -78,7 +78,7 @@ Example:
 
 Unit: rows from tenant B returned to tenant A's caller
 Result: 3 of 20 payloads returned victim-tenant rows
-Basis: executed in docker:python:3.12-slim@sha256:... against the live service
+Basis: executed in daytona:cd-python against the live service
 Denominator: 20 payload variants attempted
 Negative space: 17 rejected fail-closed at the tenant filter (src/filters.go:88)
 ```

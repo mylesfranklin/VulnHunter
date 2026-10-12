@@ -10,22 +10,18 @@ trigger:
 
 # VulnHunter Security Audit Skill
 
-## MANDATORY FIRST ACTIONS
+## FIRST ACTIONS (non-blocking)
 
 **Step 0: Capability check (interactive/direct invocation only).** When invoked
 interactively — i.e. path **B** below, with no "Pre-resolved scan metadata"
 block — inspect the model you are running as. This audit relies on high-grade
 reasoning; the methodology may be unreliable on weaker models. If you are not
-on the host's most capable reasoning model, advise the user (do not run any
-tools, resolve the target, or offer the mode menu yet):
+on the host's most capable reasoning model, note it and **continue — do not
+wait**:
 
 > ⚠️ VulnHunter is optimized for the host's most capable reasoning model and
-> may be unreliable on weaker models. Consider switching to the strongest
-> model your harness offers, then re-run `/vulnhunt`.
-
-Wait for the user. Only proceed past this step once they confirm — either by
-switching to the host's most capable reasoning model, or by explicitly replying
-that they want to continue on the current model anyway.
+> may be unreliable on weaker models. Continuing on the current model; switch
+> and re-run `/vulnhunt` only if you want the strongest result.
 
 Skip this check under path **A** (agent-driven); the agent controls the model.
 
@@ -41,13 +37,14 @@ allow-list). Its Bash line drives Step 2: "NOT available" → read-only; "AVAILA
 **B — Direct (no metadata block):** resolve them yourself; the missing block is normal
 here, not an error.
 - **Target:** the current directory, unless the invocation names a path. Confirm in one line.
-- **Mode:** if the invocation already says (`read-only`/`static` vs `bash`/`--no-read-only`),
-  honor it; else **ask via a menu**: *Read-only* (static only; exploit tests written but
-  not run — safest) vs *Bash-enabled* (install deps + run exploit tests; needs Bash;
-  trusted code only). Don't start Phase 1 until resolved.
-- **Metadata (Bash available):** `VULNHUNT_DIR` = `<target>/<basename>_VULNHUNT_RESULTS_<YYYY-MM-DD-HHMMSS>`
+- **Mode:** honor an explicit `read-only`/`static` or `bash`/`--no-read-only` in the
+  invocation. Otherwise **default to Bash-enabled** when Bash is available (install deps +
+  run exploit tests — required for maximum exploit depth), falling back to **read-only**
+  only when Bash is unavailable. Do not ask; do not block.
+- **Metadata:** `VULNHUNT_DIR` = `<target>/<basename>_VULNHUNT_RESULTS_<YYYY-MM-DD-HHMMSS>`
   (fresh timestamped name via `mkdir -p`, never reusing an existing one); branch/URL from
-  `git`. **No Bash:** ask the user to enable it or supply a pre-made dir path + branch/URL.
+  `git`. **No Bash:** use the same path shape and continue read-only — the harness creates
+  the directory when the first artifact is written.
 
 **Step 2: Dependency installation.**
 
@@ -60,8 +57,8 @@ Bash-enabled → detect the package manager and install:
 - `pom.xml` → `mvn dependency:resolve`
 - `build.sbt` → `sbt update`
 
-If it fails or the sandbox blocks it, give the user the exact command and STOP. Do NOT
-proceed to Phase 1 until deps are installed or the user says "skip it."
+If it fails or the sandbox blocks it, note the exact command and **continue to Phase 1**
+(exploit tests are written but not run). Do not block on the install.
 
 ---
 

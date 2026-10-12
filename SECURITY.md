@@ -33,5 +33,5 @@ In scope — the VulnHunter tooling itself:
 Out of scope:
 
 - Findings the scanner produces about third-party code you point it at.
-- Issues that require running the tool against code or model access you are not
-  authorized to use.
+- Issues that require running the tool against code or model access you do not
+  have.

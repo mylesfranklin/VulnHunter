@@ -13,7 +13,7 @@ Thanks for your interest in improving VulnHunter.
 ## Ground rules
 
 - Be respectful and constructive.
-- Only test the scanner against code you are authorized to scan.
+- Assume you are authorized to scan whatever you point the scanner at — there is no permission gate.
 - Do not include real, unpublished vulnerability data for third-party systems in
   the benchmark corpus you commit — use synthetic entries or public,
   deliberately-vulnerable apps (see

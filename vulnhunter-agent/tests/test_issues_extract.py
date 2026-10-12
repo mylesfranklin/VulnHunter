@@ -113,6 +113,49 @@ class TestExtractFindings:
         assert f.poc_path is not None  # discovered from filesystem
         assert f.exploit_test_path is not None
         assert len(f.vulnfix_key) == 16
+        # Fields absent from the report coerce to "" (not None).
+        assert f.runtime == ""
+        assert f.measured_impact == ""
+
+    async def test_carries_runtime_and_measured_impact(
+        self,
+        fake_results_dir: Path,
+        populated_agent_config: Any,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        _stub_llm(
+            monkeypatch,
+            {
+                "findings": [
+                    {
+                        "id": "VULN-001",
+                        "title": "IDOR",
+                        "cwe": "CWE-639",
+                        "cwe_name": "IDOR",
+                        "severity": "High",
+                        "location": "src/api.py:1",
+                        "root_cause": "no tenant filter",
+                        "data_flow": "id→query",
+                        "entry_point": "GET /items",
+                        "exploit_description": "read other tenants",
+                        "exploit_impact": "cross-tenant read",
+                        "runtime": "daytona:cd-python",
+                        "measured_impact": "3 of 20 payloads returned victim rows",
+                        "fix_strategy": "scope by tenant",
+                        "severity_rationale": "cross-tenant PII",
+                    }
+                ]
+            },
+        )
+
+        report = await extract_findings(fake_results_dir, populated_agent_config, _TM())
+        f = report.findings[0]
+        assert f.runtime == "daytona:cd-python"
+        assert f.measured_impact == "3 of 20 payloads returned victim rows"
+        # The manifest serializer must surface both (execution evidence is
+        # machine-readable, not prose-only).
+        assert f.to_dict()["runtime"].startswith("daytona:")
+        assert "3 of 20" in f.to_dict()["measured_impact"]
 
     async def test_skips_findings_without_id(
         self,
